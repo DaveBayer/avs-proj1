@@ -57,29 +57,39 @@ BatchMandelCalculator::~BatchMandelCalculator()
 }
 
 
+
 int * BatchMandelCalculator::calculateMandelbrot()
 {
-	for (int i = 0; i < height; i++) {
-		float y = y_start + i * dy; // current imaginary value
+	for (int i = 0; i < height; i += BATCH_SIZE) {
+		int h_limit = i + BATCH_SIZE > height ? height : i + BATCH_SIZE;
 
-		int *d = data + i * width;
-		float *zR = zReal + i * width;
-		float *zI = zImag + i * width;
+		for (int j = 0; j < width; j += BATCH_SIZE) {
+			int w_limit = j + BATCH_SIZE > width ? width : j + BATCH_SIZE;
 
-		for (int k = 0; k < limit; k++) {
-			
-#			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
-			for (int j = 0; j < width; j++) {
+			for (int l = i; l < h_limit; l++) {
+				float y = y_start + l * dy;
 
-				float x = x_start + j * dx;
+				int *d = data + l * width;
+				float *zR = zReal + l * width;
+				float *zI = zImag + l * width;
+				
+				int done = 0;
 
-				float r2 = zR[j] * zR[j];
-				float i2 = zI[j] * zI[j];
+				for (int k = 0; k < limit && done < BATCH_SIZE; k++) {
+					
+#					pragma omp simd reduction(+: done) simdlen(SIMD_512_ALIGNMENT)
+					for (int m = j; m < w_limit; m++) {
+						float x = x_start + m * dx;
 
-				d[j] = d[j] == limit && r2 + i2 > 4.0f ? k : d[j];
+						float r2 = zR[m] * zR[m];
+						float i2 = zI[m] * zI[m];
 
-				zI[j] = 2.0f * zR[j] * zI[j] + y;
-				zR[j] = r2 - i2 + x;
+						d[m] = d[m] == limit && r2 + i2 > 4.0f ? done++, k : d[m];
+
+						zI[m] = 2.0f * zR[m] * zI[m] + y;
+						zR[m] = r2 - i2 + x;
+					}
+				}
 			}
 		}
 	}
