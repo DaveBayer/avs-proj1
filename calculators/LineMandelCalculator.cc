@@ -59,31 +59,26 @@ int * LineMandelCalculator::calculateMandelbrot()
 	for (int i = 0; i < height; i++) {
 		float y = y_start + i * dy; // current imaginary value
 
-		int	  *pdata  = data  + i * width;
-		float *pzReal = zReal + i * width;
-		float *pzImag = zImag + i * width;
+		int *d = data + i * width;
+		float *zR = zReal + i * width;
+		float *zI = zImag + i * width;
 
-//		int done = 0;
+		int done = 0;
 
-		for (int k = 0; k < limit/* && done < width*/; k++) {
+		for (int k = 0; k < limit && done < width; k++) {
 			
-//#			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
+#			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduce(+: done)
 			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx;
 
-				float r2 = pzReal[j] * zReal[j];
-				float i2 = zImag[j] * zImag[j];
-/*
-				if (pdata[j] == limit && r2 + i2 > 4.0f) {
-					done++;
-					pdata[j] = k;
-				}
-*/
-				pdata[j] = pdata[j] == limit && r2 + i2 > 4.0f ? /*done++,*/ k : pdata[j];
+				float r2 = zR[j] * zR[j];
+				float i2 = zI[j] * zI[j];
 
-				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
-				zReal[j] = r2 - i2 + x;
+				d[j] = d[j] == limit && r2 + i2 > 4.0f ? done++, k : d[j];
+
+				zI[j] = 2.0f * zR[j] * zI[j] + y;
+				zR[j] = r2 - i2 + x;
 			}
 		}
 	}
