@@ -16,7 +16,7 @@
 
 #include "BatchMandelCalculator.h"
 
-#define USE_INTRINSICS
+//	#define USE_INTRINSICS
 
 #define SIMD_512_ALIGNMENT 64
 #define BATCH_SIZE 128
