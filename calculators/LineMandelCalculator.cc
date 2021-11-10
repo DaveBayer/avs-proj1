@@ -80,7 +80,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 					pdata[j] = k;
 				}
 */
-				pdata[j] = pdata[j] == limit && r2 + i2 > 4.0f ? done++, k : pdata[j];
+				pdata[j] = pdata[j] == limit && r2 + i2 > 4.0f ? /*done++,*/ k : pdata[j];
 
 				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
 				zReal[j] = r2 - i2 + x;
