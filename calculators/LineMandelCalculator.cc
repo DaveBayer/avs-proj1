@@ -64,7 +64,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 
 		for (int k = 0; k < limit; k++) {
 			
-#			pragma omp simd lastprivate(k)
+#			pragma omp simd simdlen(64)
 			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx; // current real value
@@ -72,7 +72,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 				float r2 = pzReal[j] * zReal[j];
 				float i2 = zImag[j] * zImag[j];
 
-				pdata[j] = (pdata[j] == limit && r2 + i2 > 4.0f) ? k : pdata[j];
+				pdata[j] = pdata[j] == limit && r2 + i2 > 4.0f ? k : pdata[j];
 
 				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
 				zReal[j] = r2 - i2 + x;
