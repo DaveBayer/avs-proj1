@@ -67,7 +67,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 
 		for (int k = 0; k < limit && done < width; k++) {
 			
-#			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduction(+:done)
+#			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduction(+: done)
 			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx;
@@ -86,6 +86,18 @@ int * LineMandelCalculator::calculateMandelbrot()
 			}
 		}
 	}
+
+	for (int i = 0; i < height; i++) {
+		std::cout << i << ":\t";
+
+		for (int j = 0; j < width; j++) {
+			std::cout << data[i * width + j] << "\t";
+		}
+
+		std::cout << std::endl;
+	}
+
+	std::cout << std::endl;
 
 	return data;
 }
