@@ -10,6 +10,7 @@
 #include <algorithm>
 
 #include <stdlib.h>
+#include <stdexcept>
 #include <immintrin.h>
 
 #include "LineMandelCalculator.h"
@@ -62,16 +63,19 @@ int * LineMandelCalculator::calculateMandelbrot()
 		float *pzReal = zReal + i * width;
 		float *pzImag = zImag + i * width;
 
-		for (int k = 0; k < limit; k++) {
+		int todo = width;
+
+		for (int k = 0; k < limit && todo > 0; k++) {
 			
-#			pragma omp simd simdlen(64)
+#			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduction(-: todo)
 			for (int j = 0; j < width; j++) {
 
-				float x = x_start + j * dx; // current real value
+				float x = x_start + j * dx;
 
 				float r2 = pzReal[j] * zReal[j];
 				float i2 = zImag[j] * zImag[j];
 
+				todo -= pdata[j] == limit && r2 + i2 > 4.0f ? 0 : 1;
 				pdata[j] = pdata[j] == limit && r2 + i2 > 4.0f ? k : pdata[j];
 
 				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
