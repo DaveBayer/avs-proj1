@@ -83,7 +83,7 @@ int * BatchMandelCalculator::calculateMandelbrot()
 			}
 		}
 	}
-
+/*
 	for (int i = 0; i < height; i++) {
 		std::cout << i << ":\t";
 
@@ -95,6 +95,6 @@ int * BatchMandelCalculator::calculateMandelbrot()
 	}
 
 	std::cout << std::endl;
-
+*/
 	return data;
 }
