@@ -58,23 +58,24 @@ int * LineMandelCalculator::calculateMandelbrot()
 	for (int i = 0; i < height; i++) {
 		float y = y_start + i * dy; // current imaginary value
 
+		int *pdata = data + i * width;
+		float *pzReal = zReal + i * width;
+		float *pzImag = zImag + i * width;
+
 		for (int k = 0; k < limit; k++) {
-			int *pdata = data + i * width;
-
+			
 #			pragma omp simd simdlen(64) linear(i, k)
-			for (int j = 0; j < width; j++, pdata++) {
-
-				int index = i * width + j;
+			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx; // current real value
 
-				float r2 = zReal[index] * zReal[index];
-				float i2 = zImag[index] * zImag[index];
+				float r2 = pzReal[j] * zReal[j];
+				float i2 = zImag[j] * zImag[j];
 
-				(*pdata == limit && r2 + i2 > 4.0f) ? *pdata = k : 0;
+				(pdata[j] == limit && r2 + i2 > 4.0f) ? pdata[j] = k : 0;
 
-				zImag[index] = 2.0f * zReal[index] * zImag[index] + y;
-				zReal[index] = r2 - i2 + x;
+				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
+				zReal[j] = r2 - i2 + x;
 			}
 		}
 	}
