@@ -17,7 +17,7 @@
 #include "BatchMandelCalculator.h"
 
 #define SIMD_512_ALIGNMENT 64
-#define BATCH_SIZE 128
+#define BATCH_SIZE 64
 
 BatchMandelCalculator::BatchMandelCalculator (unsigned matrixBaseSize, unsigned limit) :
 	BaseMandelCalculator(matrixBaseSize, limit, "BatchMandelCalculator")
