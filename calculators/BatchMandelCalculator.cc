@@ -161,7 +161,7 @@ int * BatchMandelCalculator::calculateMandelbrot()
 
 			__m512 dx_ps, x_start_ps, inc_ps;
 
-			dx_ps = _mm512_set1_pd(static_cast<float>(dx));
+			dx_ps = _mm512_set1_ps(static_cast<float>(dx));
 			x_start_ps = _mm512_set1_ps(static_cast<float>(x_start));
 
 			inc_ps = _mm512_set_ps(15.f, 14.f, 13.f, 12.f, 11.f, 10.f, 9.f, 8.f,
