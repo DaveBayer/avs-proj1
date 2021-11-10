@@ -74,12 +74,6 @@ LineMandelCalculator::~LineMandelCalculator()
 	zImag = nullptr;
 }
 
-#pragma omp declare simd simdlen(64)
-bool cmp_gt(float a, float b)
-{
-	return a > b;
-}
-
 int * LineMandelCalculator::calculateMandelbrot()
 {
 	for (int i = 0; i < height; i++) {
