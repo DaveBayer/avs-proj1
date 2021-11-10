@@ -62,26 +62,24 @@ int * BatchMandelCalculator::calculateMandelbrot()
 	for (int i = 0; i < height; i++) {
 		float y = y_start + i * dy; // current imaginary value
 
-		int *pdata = data + i * width;
-		float *pzReal = zReal + i * width;
-		float *pzImag = zImag + i * width;
-
-		std::cout << "iterating: " << i << "\tlimit: " << limit << std::endl;
+		int *d = data + i * width;
+		float *zR = zReal + i * width;
+		float *zI = zImag + i * width;
 
 		for (int k = 0; k < limit; k++) {
 			
-//#			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
+#			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
 			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx;
 
-				float r2 = pzReal[j] * pzReal[j];
-				float i2 = pzImag[j] * pzImag[j];
+				float r2 = zR[j] * zR[j];
+				float i2 = zI[j] * zI[j];
 
-				pdata[j] = (pdata[j] == limit && r2 + i2 > 4.0f) ? k : pdata[j];
+				d[j] = d[j] == limit && r2 + i2 > 4.0f ? k : d[j];
 
-				pzImag[j] = 2.0f * pzReal[j] * pzImag[j] + y;
-				pzReal[j] = r2 - i2 + x;
+				zI[j] = 2.0f * zR[j] * zI[j] + y;
+				zR[j] = r2 - i2 + x;
 			}
 		}
 	}
