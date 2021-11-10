@@ -65,16 +65,19 @@ int * LineMandelCalculator::calculateMandelbrot()
 
 				int index = i * width + j;
 
-				float x = x_start + j * dx; // current real value
+				if (data[index] == -1) {
 
-				float r2 = zReal[index] * zReal[index];
-				float i2 = zImag[index] * zImag[index];
+					float x = x_start + j * dx; // current real value
 
-				if (r2 + i2 > 4.0f && data[index] == -1)
-					data[index] = k;
+					float r2 = zReal[index] * zReal[index];
+					float i2 = zImag[index] * zImag[index];
 
-				zImag[index] = 2.0f * zReal[index] * zImag[index] + y;
-				zReal[index] = r2 - i2 + x;
+					if (r2 + i2 > 4.0f)
+						data[index] = k;
+
+					zImag[index] = 2.0f * zReal[index] * zImag[index] + y;
+					zReal[index] = r2 - i2 + x;
+				}
 			}
 		}
 
