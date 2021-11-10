@@ -84,5 +84,5 @@ int * BatchMandelCalculator::calculateMandelbrot()
 		}
 	}
 
-	return data;
+	return nullptr;
 }
