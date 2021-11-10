@@ -60,7 +60,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 
 		for (int k = 0; k < limit; k++) {
 
-#			pragma omp simd simdlen(64)
+//#			pragma omp simd simdlen(64)
 			for (int j = 0; j < width; j++) {
 
 				int index = i * width + j;
