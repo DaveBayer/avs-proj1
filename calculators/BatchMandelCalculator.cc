@@ -70,7 +70,7 @@ int * BatchMandelCalculator::calculateMandelbrot()
 
 		for (int k = 0; k < limit; k++) {
 			
-#			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
+//#			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
 			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx;
