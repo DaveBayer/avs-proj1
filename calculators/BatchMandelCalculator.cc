@@ -75,8 +75,8 @@ int * BatchMandelCalculator::calculateMandelbrot()
 
 				float x = x_start + j * dx;
 
-				float r2 = pzReal[j] * zReal[j];
-				float i2 = zImag[j] * zImag[j];
+				float r2 = pzReal[j] * pzReal[j];
+				float i2 = pzImag[j] * pzImag[j];
 
 				pdata[j] = (pdata[j] == limit && r2 + i2 > 4.0f) ? k : pdata[j];
 
