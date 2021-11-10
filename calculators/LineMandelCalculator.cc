@@ -16,27 +16,6 @@
 
 #define SIMD_512_ALIGNMENT 64
 
-bool ptr_valid(int count, ...)
-{
-	bool valid = true;
-
-	va_list ap;
-	va_start(ap, count);
-
-	for (int i = 0; i < count; i++) {
-		void *ptr = va_arg(ap, void *);
-
-		if (ptr == nullptr) {
-			valid = false;
-			break;
-		}
-	}
-
-	va_end(ap);
-
-	return valid;
-}
-
 LineMandelCalculator::LineMandelCalculator (unsigned matrixBaseSize, unsigned limit) :
 	BaseMandelCalculator(matrixBaseSize, limit, "LineMandelCalculator")
 {
@@ -44,7 +23,7 @@ LineMandelCalculator::LineMandelCalculator (unsigned matrixBaseSize, unsigned li
 	zReal = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
 	zImag = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
 
-	if (ptr_valid(3, data, zReal, zImag)) {
+	if (data == nullptr || zReal == nullptr || zImag == nullptr) {
 		throw std::bad_alloc();
 	}
 
