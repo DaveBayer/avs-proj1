@@ -83,6 +83,15 @@ int * LineMandelCalculator::calculateMandelbrot()
 				}
 			}
 		}
+
+		int *pdata = data + i * width;
+#		pragma omp simd simdlen(64)
+		for (int j = 0; j < width; j++) {
+			int &d = pdata[j];
+
+			if (d == -1)
+				d = limit;
+		}
 	}
 
 	return data;
