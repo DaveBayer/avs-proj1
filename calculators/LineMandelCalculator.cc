@@ -63,11 +63,11 @@ int * LineMandelCalculator::calculateMandelbrot()
 		float *pzReal = zReal + i * width;
 		float *pzImag = zImag + i * width;
 
-		int todo = width;
+		int done = 0;
 
-		for (int k = 0; k < limit && todo > 0; k++) {
+		for (int k = 0; k < limit && done < width; k++) {
 			
-#			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduction(-: todo)
+#			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduction(+: done)
 			for (int j = 0; j < width; j++) {
 
 				float x = x_start + j * dx;
@@ -75,7 +75,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 				float r2 = pzReal[j] * zReal[j];
 				float i2 = zImag[j] * zImag[j];
 
-				todo = (pdata[j] == limit && r2 + i2 > 4.0f ? 1 : 0);
+				done += (pdata[j] == limit && r2 + i2 > 4.0f ? 1 : 0);
 				pdata[j] = pdata[j] == limit && r2 + i2 > 4.0f ? k : pdata[j];
 
 				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
