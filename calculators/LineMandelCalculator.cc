@@ -66,7 +66,6 @@ int * LineMandelCalculator::calculateMandelbrot()
 				int index = i * width + j;
 
 				if (data[index] == -1) {
-
 					float x = x_start + j * dx; // current real value
 
 					float r2 = zReal[index] * zReal[index];
