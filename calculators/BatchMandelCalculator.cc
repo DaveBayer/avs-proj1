@@ -80,8 +80,8 @@ int * BatchMandelCalculator::calculateMandelbrot()
 
 				pdata[j] = (pdata[j] == limit && r2 + i2 > 4.0f) ? k : pdata[j];
 
-				zImag[j] = 2.0f * zReal[j] * zImag[j] + y;
-				zReal[j] = r2 - i2 + x;
+				pzImag[j] = 2.0f * pzReal[j] * pzImag[j] + y;
+				pzReal[j] = r2 - i2 + x;
 			}
 		}
 	}
