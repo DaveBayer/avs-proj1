@@ -71,8 +71,11 @@ int * LineMandelCalculator::calculateMandelbrot()
 				float r2 = zReal[index] * zReal[index];
 				float i2 = zImag[index] * zImag[index];
 
-				if (*pdata == -1 && r2 + i2 > 4.0f)
+				if (r2 + i2 > 4.0f) {
 					*pdata = k;
+					zReal[index] = 0.f;
+					zImag[index] = 0.f;
+				}
 
 				zImag[index] = 2.0f * zReal[index] * zImag[index] + y;
 				zReal[index] = r2 - i2 + x;
