@@ -61,7 +61,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 		for (int k = 0; k < limit; k++) {
 			int *pdata = data + i * width;
 
-#			pragma omp simd simdlen(64) lastprivate(pdata)
+#			pragma omp simd simdlen(64) linear(i, k)
 			for (int j = 0; j < width; j++, pdata++) {
 
 				int index = i * width + j;
