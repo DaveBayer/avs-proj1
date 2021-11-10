@@ -82,18 +82,6 @@ int * LineMandelCalculator::calculateMandelbrot()
 			}
 		}
 	}
-/*
-	for (int i = 0; i < height; i++) {
-		std::cout << i << ":\t";
 
-		for (int j = 0; j < width; j++) {
-			std::cout << data[i * width + j] << "\t";
-		}
-
-		std::cout << std::endl;
-	}
-
-	std::cout << std::endl;
-*/
 	return data;
 }
