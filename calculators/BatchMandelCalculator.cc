@@ -66,6 +66,8 @@ int * BatchMandelCalculator::calculateMandelbrot()
 		float *pzReal = zReal + i * width;
 		float *pzImag = zImag + i * width;
 
+		std::cout << "iterating: " << i << "\tlimit: " << limit << std::endl;
+
 		for (int k = 0; k < limit; k++) {
 			
 #			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
