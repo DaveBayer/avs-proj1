@@ -17,7 +17,7 @@
 #include "BatchMandelCalculator.h"
 
 #define SIMD_512_ALIGNMENT 64
-#define BATCH_SIZE 256
+#define BATCH_SIZE 128
 
 BatchMandelCalculator::BatchMandelCalculator (unsigned matrixBaseSize, unsigned limit) :
 	BaseMandelCalculator(matrixBaseSize, limit, "BatchMandelCalculator")
@@ -72,7 +72,7 @@ int * BatchMandelCalculator::calculateMandelbrot()
 				int *d = data + l * width;
 				float *zR = zReal + l * width;
 				float *zI = zImag + l * width;
-				
+
 				int done = 0;
 
 				for (int k = 0; k < limit && done < BATCH_SIZE; k++) {
