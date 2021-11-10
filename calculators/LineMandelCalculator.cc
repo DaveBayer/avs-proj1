@@ -65,7 +65,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 
 		int done = 0;
 
-		for (int k = 0; k < limit && done < width; k++) {
+		for (int k = 0; k < limit/* && done < width*/; k++) {
 			
 #			pragma omp simd simdlen(SIMD_512_ALIGNMENT)
 			for (int j = 0; j < width; j++) {
