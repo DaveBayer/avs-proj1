@@ -59,11 +59,11 @@ int * LineMandelCalculator::calculateMandelbrot()
 	for (int i = 0; i < height; i++) {
 		float y = y_start + i * dy; // current imaginary value
 
-		int *pdata = data + i * width;
+		int	  *pdata  = data  + i * width;
 		float *pzReal = zReal + i * width;
 		float *pzImag = zImag + i * width;
 
-		int done = 0;
+//		int done = 0;
 
 		for (int k = 0; k < limit/* && done < width*/; k++) {
 			
