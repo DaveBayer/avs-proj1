@@ -62,6 +62,8 @@ BatchMandelCalculator::~BatchMandelCalculator()
 
 int * BatchMandelCalculator::calculateMandelbrot()
 {
+	float dx_f = dx, dy_f = dy, y_start_f = y_start, x_start_f = x_start;
+
 	for (int i = 0; i < height; i += BATCH_SIZE) {
 		int h_limit = i + BATCH_SIZE > height ? height : i + BATCH_SIZE;
 
@@ -69,7 +71,7 @@ int * BatchMandelCalculator::calculateMandelbrot()
 			int w_limit = j + BATCH_SIZE > width ? width : j + BATCH_SIZE;
 
 			for (int l = i; l < h_limit; l++) {
-				float y = y_start + l * dy;
+				float y = y_start_f + l * dy_f;
 
 				int *d = data + l * width;
 				float *zR = zReal + l * width;
@@ -81,7 +83,7 @@ int * BatchMandelCalculator::calculateMandelbrot()
 					
 #					pragma omp simd reduction(+: done) simdlen(SIMD_512_ALIGNMENT)
 					for (int m = j; m < w_limit; m++) {
-						float x = x_start + m * dx;
+						float x = x_start_f + m * dx_f;
 
 						float r2 = zR[m] * zR[m];
 						float i2 = zI[m] * zI[m];

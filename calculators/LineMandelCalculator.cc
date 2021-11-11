@@ -60,8 +60,10 @@ LineMandelCalculator::~LineMandelCalculator()
 
 int * LineMandelCalculator::calculateMandelbrot()
 {
+	float dx_f = dx, dy_f = dy, y_start_f = y_start, x_start_f = x_start;
+
 	for (int i = 0; i < height; i++) {
-		float y = y_start + i * dy;
+		float y = y_start_f + i * dy_f;
 
 		int *d = data + i * width;
 		float *zR = zReal + i * width;
@@ -74,7 +76,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 #			pragma omp simd simdlen(SIMD_512_ALIGNMENT) reduction(+: done)
 			for (int j = 0; j < width; j++) {
 
-				float x = x_start + j * dx;
+				float x = x_start_f + j * dx_f;
 
 				float r2 = zR[j] * zR[j];
 				float i2 = zI[j] * zI[j];
