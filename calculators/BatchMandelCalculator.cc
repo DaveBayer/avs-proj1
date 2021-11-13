@@ -26,10 +26,11 @@ BatchMandelCalculator::BatchMandelCalculator (unsigned matrixBaseSize, unsigned 
 {
 	data = (int *) _mm_malloc(height * width * sizeof(int), SIMD_512_ALIGNMENT);
 	xs = (float *) _mm_malloc(width * sizeof(float), SIMD_512_ALIGNMENT);
+	ys = (float *) _mm_malloc(height * sizeof(float), SIMD_512_ALIGNMENT);
 	zReal = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
 	zImag = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
 
-	if (data == nullptr || xs == nullptr || zReal == nullptr || zImag == nullptr) {
+	if (data == nullptr || xs == nullptr || ys == nullptr || zReal == nullptr || zImag == nullptr) {
 		throw std::bad_alloc();
 	}
 
@@ -38,14 +39,14 @@ BatchMandelCalculator::BatchMandelCalculator (unsigned matrixBaseSize, unsigned 
 	}
 
 	for (int i = 0; i < height; i++) {
-		float y = y_start + i * dy;
+		ys[i] = y_start + i * dy;
 
 		for (int j = 0; j < width; j++) {
 			int index = i * width + j;
 
 			data[index] = limit;
 			zReal[index] = xs[j];
-			zImag[index] = y;
+			zImag[index] = ys[i];
 		}
 	}
 }
@@ -54,47 +55,46 @@ BatchMandelCalculator::~BatchMandelCalculator()
 {
 	_mm_free(data);
 	_mm_free(xs);
+	_mm_free(ys);
 	_mm_free(zReal);
 	_mm_free(zImag);
 
 	data = nullptr;
 	xs = nullptr;
+	ys = nullptr;
 	zReal = nullptr;
 	zImag = nullptr;
 }
 
 #ifndef USE_INTRINSICS
-
+/*
 int * BatchMandelCalculator::calculateMandelbrot()
 {
-	float dx_f = dx, dy_f = dy, y_start_f = y_start, x_start_f = x_start;
-
 	for (int i = 0; i < height; i += BATCH_SIZE) {
-		int h_limit = i + BATCH_SIZE > height ? height : i + BATCH_SIZE;
+		int h_limit = i + BATCH_SIZE > height ? height - i : BATCH_SIZE;
 
 		for (int j = 0; j < width; j += BATCH_SIZE) {
-			int w_limit = j + BATCH_SIZE > width ? width : j + BATCH_SIZE;
+			int w_limit = j + BATCH_SIZE > width ? width - j : BATCH_SIZE;
 
-			for (int l = i; l < h_limit; l++) {
-				float y = y_start_f + l * dy_f;
+			int done = 0;
+			int todo = h_limit * w_limit;
 
-				int *d = data + l * width;
-				float *zR = zReal + l * width;
-				float *zI = zImag + l * width;
+			for (int k = 0; k < limit && done < todo; k++) {
 
-				int done = 0;
 
-				for (int k = 0; k < limit && done < BATCH_SIZE; k++) {
-					
+//	collapse(2)
+				for (int l = 0; l < h_limit; l++) {		
 #					pragma omp simd reduction(+: done) simdlen(SIMD_512_ALIGNMENT)
-					for (int m = j; m < w_limit; m++) {
-						float r2 = zR[m] * zR[m];
-						float i2 = zI[m] * zI[m];
+					for (int m = 0; m < w_limit; m++) {
+						int index = (i + l) * width + j + m;
 
-						d[m] = d[m] == limit && r2 + i2 > 4.0f ? done++, k : d[m];
+						float r2 = zReal[index] * zReal[index];
+						float i2 = zImag[index] * zImag[index];
 
-						zI[m] = 2.0f * zR[m] * zI[m] + y;
-						zR[m] = r2 - i2 + xs[m];
+						data[index] = data[index] == limit && r2 + i2 > 4.0f ? done++, k : data[index];
+
+						zImag[index] = 2.0f * zReal[index] * zImag[index] + ys[i + l];
+						zReal[index] = r2 - i2 + xs[j + m];
 					}
 				}
 			}
@@ -102,6 +102,53 @@ int * BatchMandelCalculator::calculateMandelbrot()
 	}
 
 	return data;
+}
+*/
+
+int *BatchMandelCalculator::calculateMandelbrot()
+{
+	constexpr int L3_batch_size = 512;
+	constexpr int L2_batch_size = 128;
+
+	for (int i3 = 0; i3 < height; i3 += L3_batch_size) {
+		int h2_limit = i3 + L3_batch_size > height ? height - i3 : L3_batch_size;
+
+		for (int j3 = 0; j3 < width; j3 += L3_batch_size) {
+			int w2_limit = j3 + L3_batch_size > width ? width - j3 : L3_batch_size;
+
+			for (int i2 = 0; i2 < h2_limit; i2 += L2_batch_size) {
+				int h1_limit = i3 + i2 + L2_batch_size > height ? height - i3 - i2 : L2_batch_size;
+
+				for (int j2 = 0; j2 < w2_limit; j2 += L2_batch_size) {
+					int w1_limit = j3 + j2 + L2_batch_size > width ? width - j3 - j2 : L2_batch_size;
+
+					int done = 0;
+					const int todo = h1_limit * w1_limit;
+
+					for (int k = 0; k < limit && done < todo; k++) {
+
+#						pragma omp simd reduciton(+: done) simdlen(SIMD_512_ALIGNMENT)
+						for (int i1 = 0; i1 < h1_limit; i1++) {
+							for (int j1 = 0; j1 < w1_limit; j1++) {
+								const int row = i3 + i2 + i1;
+								const int col = j3 + j2 + j1;
+
+								const int index = row * width + col;
+
+								float r2 = zReal[index] * zReal[index];
+								float i2 = zImag[index] * zImag[index];
+
+								data[index] = data[index] == limit && r2 + i2 > 4.0f ? done++, k : data[index];
+
+								zImag[index] = 2.0f * zReal[index] * zImag[index] + ys[row];
+								zReal[index] = r2 - i2 + xs[col];
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 #else

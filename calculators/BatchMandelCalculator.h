@@ -19,6 +19,7 @@ public:
 private:
     int *data;
     float *xs;
+    float *ys;
     float *zReal;
     float *zImag;
 };

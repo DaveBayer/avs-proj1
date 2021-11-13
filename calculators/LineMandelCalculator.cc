@@ -18,12 +18,18 @@
 //	#define USE_INTRINSICS
 
 #define SIMD_512_ALIGNMENT 64
+#define SIMD_512_PSIZE_32BIT 16
 
 LineMandelCalculator::LineMandelCalculator (unsigned matrixBaseSize, unsigned limit) :
 	BaseMandelCalculator(matrixBaseSize, limit, "LineMandelCalculator")
 {
+	//	extend for aligned loading without mask
+	int xs_len = width;
+	if (xs_len % SIMD_512_PSIZE_32BIT > 0)
+		xs_len += SIMD_512_PSIZE_32BIT - (xs_len % SIMD_512_PSIZE_32BIT);
+
 	data = (int *) _mm_malloc(height * width * sizeof(int), SIMD_512_ALIGNMENT);
-	xs = (float *) _mm_malloc(width * sizeof(float), SIMD_512_ALIGNMENT);
+	xs = (float *) _mm_malloc(xs_len * sizeof(float), SIMD_512_ALIGNMENT);
 	zReal = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
 	zImag = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
 
@@ -31,7 +37,7 @@ LineMandelCalculator::LineMandelCalculator (unsigned matrixBaseSize, unsigned li
 		throw std::bad_alloc();
 	}
 
-	for (int i = 0; i < width; i++) {
+	for (int i = 0; i < xs_len; i++) {
 		xs[i] = x_start + i * dx;
 	}
 
@@ -65,10 +71,8 @@ LineMandelCalculator::~LineMandelCalculator()
 
 int * LineMandelCalculator::calculateMandelbrot()
 {
-	float dx_f = dx, dy_f = dy, y_start_f = y_start, x_start_f = x_start;
-
 	for (int i = 0; i < height; i++) {
-		float y = y_start_f + i * dy_f;
+		float y = y_start + i * dy;
 
 		int *d = data + i * width;
 		float *zR = zReal + i * width;
@@ -101,7 +105,7 @@ int * LineMandelCalculator::calculateMandelbrot()
 static inline __attribute__((always_inline))
 __m512i mandelbrot(__m512 real, __m512 imag, int limit, __mmask16 mask)
 {
-	__m512i result = _mm512_setzero_epi32();
+	__m512i result = _mm512_set1_epi32(limit);
 	__mmask16 result_mask = mask;
 
 	const __m512 two = _mm512_set1_ps(2.f);
@@ -124,7 +128,7 @@ __m512i mandelbrot(__m512 real, __m512 imag, int limit, __mmask16 mask)
 		result_mask &= ~test_mask;
 
 		if (result_mask == 0x0000U)
-			return result;
+			break;
 		
 	//	zImag = 2.0f * zReal * zImag + imag;
 		zImag = _mm512_fmadd_ps(_mm512_mul_ps(two, zReal), zImag, imag);
@@ -133,31 +137,18 @@ __m512i mandelbrot(__m512 real, __m512 imag, int limit, __mmask16 mask)
 		zReal = _mm512_add_ps(_mm512_sub_ps(r2, i2), real);
 	}
 
-	return _mm512_mask_mov_epi32(result, result_mask, _mm512_set1_epi32(limit));
+	return result;
 }
 
 int *LineMandelCalculator::calculateMandelbrot () {
 	// @TODO implement the calculator & return array of integers
 	int *pdata = data;
-
-	__m512 dx_ps, x_start_ps, inc_ps;
-
-	dx_ps = _mm512_set1_ps(static_cast<float>(dx));
-	x_start_ps = _mm512_set1_ps(static_cast<float>(x_start));
-
-	inc_ps = _mm512_set_ps(15.f, 14.f, 13.f, 12.f, 11.f, 10.f, 9.f, 8.f,
-						   7.f, 6.f, 5.f, 4.f, 3.f, 2.f, 1.f, 0.f);
-
+	
 	for (int i = 0; i < height; i++) {
 	//	y = y_start + i * dy
 		const __m512 y_ps = _mm512_set1_ps(y_start + i * dy);
 
 		for (int j = 0; j < width; j += MM_PSIZE_32BIT) {
-		//	prepare j
-			__m512 j_ps = _mm512_add_ps(_mm512_set1_ps(static_cast<float>(j)), inc_ps);
-
-		//	x = x_start + j * dx
-			__m512 x_ps = _mm512_add_ps(x_start_ps, _mm512_mul_ps(j_ps, dx_ps));
 
 		//	get mask for avx instructions and data pointer increment
 			__mmask16 mask = 0xffffU;
@@ -169,6 +160,8 @@ int *LineMandelCalculator::calculateMandelbrot () {
 				mask >>= MM_PSIZE_32BIT - diff;
 				inc = diff;
 			}
+
+			__m512 x_ps = _mm512_load_ps(xs + j * MM_PSIZE_32BIT);
 
 			__m512i values = mandelbrot(x_ps, y_ps, limit, mask);
 
