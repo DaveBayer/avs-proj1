@@ -1,0 +1,38 @@
+#### Stručně odpovězte na následující otázky: ######
+
+1. Proč je nutné určovat, zda má výpočet pokračovat?
+==============================================================================
+Aby se neprováděly zbytečné iterace nad již spočítanými hodnotami.
+
+2. Byla "Line" vektorizace efektivní? Proč?
+==============================================================================
+Příliš nebyla, jelikož opakovaně přistupujeme k hodnotám, které mezi jednotlivými
+iteracemi vypadnou z cache, protože je mezitím nahradí jiné hodnoty z řádku a je
+třeba čekat na jejich opětovné načtení.
+
+3. Jaká byla dosažena výkonnost v Intel Advisoru pro jednotlivé implementace 
+(v GFLOPS)?
+==============================================================================
+Batch: 19.59 GFLOPS (intrinsic verze: 36.60 GFLOPS)
+Line: 27.44 GFLOPS (intrinsic verze: 37.46 GFLOPS)
+
+
+4. Jaká část kódu byla paralizována v "Line" implementaci? Vyčteme tuto 
+informaci i u batch kalkulátoru?
+==============================================================================
+Byla vektorizována smyčka, která prochází hodnoty na řádku. Byly z ní vytvořeny
+3 verze:
+
+1) Procházení po 16 hodnotách (AVX512)
+2) Procházení po 16 hodnotách s maskou - např. pro konce řádků, které nejsou
+   zarovnány na 16 hodnot (AVX512)
+3) Nevektorizovaná (pro FPU)
+
+Ano. Pouze verze 1.
+
+5. Co vyčteme z Roofline modelu pro obě vektorizované implementace?
+==============================================================================
+Můžeme vyčíst, že implementace "batch" má nižší aritmetickou intenzitu přičemž
+si však drží podobný výkon. Advisor u obou implementací indikuje memory bound,
+zároveň však připouští, že výpočet může být omezen také výpočetním výkonem.
+Obě implentace využívají plně L3 cache.

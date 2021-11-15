@@ -1,8 +1,8 @@
 /**
  * @file BatchMandelCalculator.cc
- * @author FULL NAME <xlogin00@stud.fit.vutbr.cz>
+ * @author David Bayer <xbayer09@stud.fit.vutbr.cz>
  * @brief Implementation of Mandelbrot calculator that uses SIMD paralelization over small batches
- * @date DATE
+ * @date 2021/11/14
  */
 
 #include <iostream>
@@ -19,28 +19,46 @@
 //	#define USE_INTRINSICS
 
 #define SIMD_512_ALIGNMENT 64
-#define BATCH_SIZE 128
+
+constexpr int SIMD_512_PSIZE_32BIT = 16;
+constexpr int L3_batch_size = 512;
+constexpr int L2_batch_size = 128;
 
 BatchMandelCalculator::BatchMandelCalculator (unsigned matrixBaseSize, unsigned limit) :
 	BaseMandelCalculator(matrixBaseSize, limit, "BatchMandelCalculator")
 {
-	data = (int *) _mm_malloc(height * width * sizeof(int), SIMD_512_ALIGNMENT);
-	xs = (float *) _mm_malloc(width * sizeof(float), SIMD_512_ALIGNMENT);
-	ys = (float *) _mm_malloc(height * sizeof(float), SIMD_512_ALIGNMENT);
-	zReal = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
-	zImag = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
+	int xs_len;
 
-	if (data == nullptr || xs == nullptr || ys == nullptr || zReal == nullptr || zImag == nullptr) {
+	if (matrixBaseSize % SIMD_512_PSIZE_32BIT == 0)
+		xs_len = width;
+	else
+		xs_len = width + SIMD_512_PSIZE_32BIT - (width % SIMD_512_PSIZE_32BIT);
+
+	data = (int *) _mm_malloc(height * width * sizeof(int), SIMD_512_ALIGNMENT);
+	xs = (float *) _mm_malloc(xs_len * sizeof(float), SIMD_512_ALIGNMENT);
+	ys = (float *) _mm_malloc(height * sizeof(float), SIMD_512_ALIGNMENT);
+
+	if (data == nullptr || xs == nullptr || ys == nullptr) {
 		throw std::bad_alloc();
 	}
 
-	for (int i = 0; i < width; i++) {
+	for (int i = 0; i < xs_len; i++) {
 		xs[i] = x_start + i * dx;
 	}
 
 	for (int i = 0; i < height; i++) {
 		ys[i] = y_start + i * dy;
+	}
 
+#ifndef USE_INTRINSICS
+	zReal = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
+	zImag = (float *) _mm_malloc(height * width * sizeof(float), SIMD_512_ALIGNMENT);
+
+	if (zReal == nullptr || zImag == nullptr) {
+		throw std::bad_alloc();
+	}
+
+	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++) {
 			int index = i * width + j;
 
@@ -49,6 +67,12 @@ BatchMandelCalculator::BatchMandelCalculator (unsigned matrixBaseSize, unsigned 
 			zImag[index] = ys[i];
 		}
 	}
+#endif	//	USE_INTRINSICS
+
+	if (matrixBaseSize % L3_batch_size == 0)
+		chosen_calculator = &BatchMandelCalculator::calculateMandelbrot_aligned;
+	else
+		chosen_calculator = &BatchMandelCalculator::calculateMandelbrot_unaligned;
 }
 
 BatchMandelCalculator::~BatchMandelCalculator()
@@ -56,60 +80,60 @@ BatchMandelCalculator::~BatchMandelCalculator()
 	_mm_free(data);
 	_mm_free(xs);
 	_mm_free(ys);
-	_mm_free(zReal);
-	_mm_free(zImag);
 
 	data = nullptr;
 	xs = nullptr;
 	ys = nullptr;
+
+#ifndef USE_INTRINSICS
+	_mm_free(zReal);
+	_mm_free(zImag);
+
 	zReal = nullptr;
 	zImag = nullptr;
+#endif	//	USE_INTRINSICS
 }
 
 #ifndef USE_INTRINSICS
-/*
-int * BatchMandelCalculator::calculateMandelbrot()
+
+void BatchMandelCalculator::calculateMandelbrot_aligned()
 {
-	for (int i = 0; i < height; i += BATCH_SIZE) {
-		int h_limit = i + BATCH_SIZE > height ? height - i : BATCH_SIZE;
+	for (int i3 = 0; i3 < height / L3_batch_size; i3++) {
+		for (int j3 = 0; j3 < width / L3_batch_size; j3++) {
+			for (int i2 = 0; i2 < L3_batch_size / L2_batch_size; i2++) {
+				for (int j2 = 0; j2 < L3_batch_size / L2_batch_size; j2++) {
 
-		for (int j = 0; j < width; j += BATCH_SIZE) {
-			int w_limit = j + BATCH_SIZE > width ? width - j : BATCH_SIZE;
+					int done = 0;
+					const int todo = L2_batch_size * L2_batch_size;
 
-			int done = 0;
-			int todo = h_limit * w_limit;
+					for (int k = 0; k < limit && done < todo; k++) {
+						for (int i1 = 0; i1 < L2_batch_size; i1++) {
 
-			for (int k = 0; k < limit && done < todo; k++) {
+#							pragma omp simd reduction(+: done) simdlen(SIMD_512_ALIGNMENT)
+							for (int j1 = 0; j1 < L2_batch_size; j1++) {
+								const int row = i3 * L3_batch_size + i2 * L2_batch_size + i1;
+								const int col = j3 * L3_batch_size + j2 * L2_batch_size + j1;
 
+								const int index = row * width + col;
 
-//	collapse(2)
-				for (int l = 0; l < h_limit; l++) {		
-#					pragma omp simd reduction(+: done) simdlen(SIMD_512_ALIGNMENT)
-					for (int m = 0; m < w_limit; m++) {
-						int index = (i + l) * width + j + m;
+								float r2 = zReal[index] * zReal[index];
+								float i2 = zImag[index] * zImag[index];
 
-						float r2 = zReal[index] * zReal[index];
-						float i2 = zImag[index] * zImag[index];
+								data[index] = data[index] == limit && r2 + i2 > 4.0f ? done++, k : data[index];
 
-						data[index] = data[index] == limit && r2 + i2 > 4.0f ? done++, k : data[index];
-
-						zImag[index] = 2.0f * zReal[index] * zImag[index] + ys[i + l];
-						zReal[index] = r2 - i2 + xs[j + m];
+								zImag[index] = 2.0f * zReal[index] * zImag[index] + ys[row];
+								zReal[index] = r2 - i2 + xs[col];
+							}
+						}
 					}
 				}
 			}
 		}
 	}
-
-	return data;
 }
-*/
 
-int *BatchMandelCalculator::calculateMandelbrot()
+void BatchMandelCalculator::calculateMandelbrot_unaligned()
 {
-	constexpr int L3_batch_size = 512;
-	constexpr int L2_batch_size = 128;
-
 	for (int i3 = 0; i3 < height; i3 += L3_batch_size) {
 		int h2_limit = i3 + L3_batch_size > height ? height - i3 : L3_batch_size;
 
@@ -126,9 +150,9 @@ int *BatchMandelCalculator::calculateMandelbrot()
 					const int todo = h1_limit * w1_limit;
 
 					for (int k = 0; k < limit && done < todo; k++) {
-
-#						pragma omp simd reduciton(+: done) simdlen(SIMD_512_ALIGNMENT)
 						for (int i1 = 0; i1 < h1_limit; i1++) {
+
+#							pragma omp simd reduction(+: done) simdlen(SIMD_512_ALIGNMENT)
 							for (int j1 = 0; j1 < w1_limit; j1++) {
 								const int row = i3 + i2 + i1;
 								const int col = j3 + j2 + j1;
@@ -153,12 +177,10 @@ int *BatchMandelCalculator::calculateMandelbrot()
 
 #else
 
-#	define MM_PSIZE_32BIT 16
-
 static inline __attribute__((always_inline))
-__m512i mandelbrot(__m512 real, __m512 imag, int limit, __mmask16 mask)
+__m512i mandelbrot(__m512 real, __m512 imag, int limit, __mmask16 mask = 0xffffU)
 {
-	__m512i result = _mm512_setzero_epi32();
+	__m512i result = _mm512_set1_epi32(limit);
 	__mmask16 result_mask = mask;
 
 	const __m512 two = _mm512_set1_ps(2.f);
@@ -167,78 +189,94 @@ __m512i mandelbrot(__m512 real, __m512 imag, int limit, __mmask16 mask)
 	__m512 zReal = real;
 	__m512 zImag = imag;
 
-	for (int i = 0; i < limit; i++) {
-	//	r2 = zReal * zReal
+	for (int i = 0; i < limit && result_mask != 0x0000U; i++) {
 		const __m512 r2 = _mm512_mul_ps(zReal, zReal);
-
-	//	i2 = zImag * zImag
 		const __m512 i2 = _mm512_mul_ps(zImag, zImag);
 
-	//	if (r2 + i2 > 4.0f) then write i to result and update result_mask
 		__mmask16 test_mask = _mm512_cmp_ps_mask(_mm512_add_ps(r2, i2), four, _CMP_GT_OS);
-
 		result = _mm512_mask_mov_epi32(result, test_mask & result_mask, _mm512_set1_epi32(i));
-		result_mask &= ~test_mask;
-
-		if (result_mask == 0x0000U)
-			return result;
 		
-	//	zImag = 2.0f * zReal * zImag + imag;
 		zImag = _mm512_fmadd_ps(_mm512_mul_ps(two, zReal), zImag, imag);
-
-	//	zReal = r2 - i2 + real;
 		zReal = _mm512_add_ps(_mm512_sub_ps(r2, i2), real);
-	}
 
-	result = _mm512_mask_mov_epi32(result, result_mask, _mm512_set1_epi32(limit));
+		result_mask &= ~test_mask;
+	}
 
 	return result;
 }
 
-int * BatchMandelCalculator::calculateMandelbrot()
+void BatchMandelCalculator::calculateMandelbrot_aligned()
 {
-	for (int i = 0; i < height; i += MM_PSIZE_32BIT) {
-		for (int j = 0; j < width; j += MM_PSIZE_32BIT) {
-			int h_limit = i + MM_PSIZE_32BIT;
+	for (int i3 = 0; i3 < height / L3_batch_size; i3++) {
+		for (int j3 = 0; j3 < width / L3_batch_size; j3++) {
+			for (int i2 = 0; i2 < L3_batch_size / L2_batch_size; i2++) {
+				for (int j2 = 0; j2 < L3_batch_size / L2_batch_size; j2++) {
+					for (int i1 = 0; i1 < L2_batch_size; i1++) {
+						for (int j1 = 0; j1 < L2_batch_size; j1 += SIMD_512_PSIZE_32BIT) {
+							const int row = i3 * L3_batch_size + i2 * L2_batch_size + i1;
+							const int col = j3 * L3_batch_size + j2 * L2_batch_size + j1;
 
-			if (h_limit >= height)
-				h_limit = height;
+							int *pdata = data + row * width + col;
 
-			__mmask16 mask = 0xffffU;
-			int diff = width - j;
-			if (diff < MM_PSIZE_32BIT)
-				mask >>= MM_PSIZE_32BIT - diff;
+							__m512 x_ps = _mm512_load_ps(xs + col);
+							__m512 y_ps = _mm512_set1_ps(ys[row]);
 
-			int *pdata = data + i * width + i;
+							__m512i values = mandelbrot(x_ps, y_ps, limit);
 
-			__m512 dx_ps, x_start_ps, inc_ps;
-
-			dx_ps = _mm512_set1_ps(static_cast<float>(dx));
-			x_start_ps = _mm512_set1_ps(static_cast<float>(x_start));
-
-			inc_ps = _mm512_set_ps(15.f, 14.f, 13.f, 12.f, 11.f, 10.f, 9.f, 8.f,
-						   		   7.f, 6.f, 5.f, 4.f, 3.f, 2.f, 1.f, 0.f);
-
-			for (int k = i; k < h_limit; k++) {
-				const __m512 y_ps = _mm512_set1_ps(y_start + k * dy);
-
-			//	prepare j
-				__m512 j_ps = _mm512_add_ps(_mm512_set1_ps(j), inc_ps);
-
-			//	x = x_start + j * dx
-				__m512 x_ps = _mm512_add_ps(x_start_ps, _mm512_mul_ps(j_ps, dx_ps));
-
-				__m512i values = mandelbrot(x_ps, y_ps, limit, mask);
-
-			//	store values in memory pointed by pdata using mask
-				_mm512_mask_storeu_epi32(pdata, mask, values);
-
-				pdata += width;
+							_mm512_store_epi32(pdata, values);
+						}
+					}
+				}
 			}
 		}
 	}
+}
 
-	return data;
+void BatchMandelCalculator::calculateMandelbrot_unaligned()
+{
+	for (int i3 = 0; i3 < height; i3 += L3_batch_size) {
+		int h2_limit = i3 + L3_batch_size > height ? height - i3 : L3_batch_size;
+
+		for (int j3 = 0; j3 < width; j3 += L3_batch_size) {
+			int w2_limit = j3 + L3_batch_size > width ? width - j3 : L3_batch_size;
+
+			for (int i2 = 0; i2 < h2_limit; i2 += L2_batch_size) {
+				int h1_limit = i3 + i2 + L2_batch_size > height ? height - i3 - i2 : L2_batch_size;
+
+				for (int j2 = 0; j2 < w2_limit; j2 += L2_batch_size) {
+					int w1_limit = j3 + j2 + L2_batch_size > width ? width - j3 - j2 : L2_batch_size;
+
+					for (int i1 = 0; i1 < h1_limit; i1++) {
+						for (int j1 = 0; j1 < w1_limit; j1 += SIMD_512_PSIZE_32BIT) {
+							const int row = i3 + i2 + i1;
+							const int col = j3 + j2 + j1;
+
+							int *pdata = data + row * width + col;
+
+							__mmask16 mask = 0xffffU;
+							int diff = width - col;
+							if (diff < SIMD_512_PSIZE_32BIT)
+								mask >>= SIMD_512_PSIZE_32BIT - diff;
+
+							__m512 x_ps = _mm512_load_ps(xs + col);
+							__m512 y_ps = _mm512_set1_ps(ys[row]);
+
+							__m512i values = mandelbrot(x_ps, y_ps, limit, mask);
+
+							_mm512_mask_storeu_epi32(pdata, mask, values);
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 #endif	//	USE_INTRINSICS
+
+int *BatchMandelCalculator::calculateMandelbrot()
+{
+	(this->*chosen_calculator)();
+
+	return data;
+}
